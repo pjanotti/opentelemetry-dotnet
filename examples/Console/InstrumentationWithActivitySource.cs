@@ -29,15 +29,16 @@ namespace Examples.Console
 {
     internal class InstrumentationWithActivitySource : IDisposable
     {
+        private const string W3CTraceParentHeader = "traceparent";
         private const string RequestPath = "/api/request";
         private SampleServer server = new SampleServer();
         private SampleClient client = new SampleClient();
 
-        public void Start(ushort port = 19999)
+        public void Start(ushort port = 19999, bool doClientContextPropagation = true)
         {
             var url = $"http://localhost:{port.ToString(CultureInfo.InvariantCulture)}{RequestPath}/";
             this.server.Start(url);
-            this.client.Start(url);
+            this.client.Start(url, doClientContextPropagation);
         }
 
         public void Dispose()
@@ -67,7 +68,8 @@ namespace Examples.Console
 
                             using var activity = source.StartActivity(
                                 $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
-                                ActivityKind.Server);
+                                ActivityKind.Server,
+                                context.Request.Headers[W3CTraceParentHeader]);
 
                             var headerKeys = context.Request.Headers.AllKeys;
                             foreach (var headerKey in headerKeys)
@@ -112,10 +114,11 @@ namespace Examples.Console
             private CancellationTokenSource cts;
             private Task requestTask;
 
-            public void Start(string url)
+            public void Start(string url, bool doClientContextPropagation)
             {
                 this.cts = new CancellationTokenSource();
                 var cancellationToken = this.cts.Token;
+                var targetUri = new Uri(url);
 
                 this.requestTask = Task.Run(
                     async () =>
@@ -132,9 +135,23 @@ namespace Examples.Console
                             {
                                 count++;
 
-                                activity?.AddEvent(new ActivityEvent("PostAsync:Started"));
-                                using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-                                activity?.AddEvent(new ActivityEvent("PostAsync:Ended"));
+                                // Use a HttpRequestMessage in order to propagate the context to the server.
+                                var request = new HttpRequestMessage
+                                {
+                                    RequestUri = targetUri,
+                                    Method = HttpMethod.Post,
+                                    Content = content,
+                                };
+
+                                // Inject the W3c context so it is propagated to the server.
+                                if (doClientContextPropagation && activity != null)
+                                {
+                                    request.Headers.Add(W3CTraceParentHeader, activity.Id);
+                                }
+
+                                activity?.AddEvent(new ActivityEvent("SendAsync:Started"));
+                                using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                                activity?.AddEvent(new ActivityEvent("SendAsync:Ended"));
 
                                 activity?.SetTag("http.status_code", $"{response.StatusCode:D}");
 

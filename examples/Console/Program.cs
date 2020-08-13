@@ -50,7 +50,7 @@ namespace Examples.Console
                     (ConsoleOptions options) => TestConsoleExporter.Run(options),
                     (OpenTelemetryShimOptions options) => TestOTelShimWithConsoleExporter.Run(options),
                     (OpenTracingShimOptions options) => TestOpenTracingWithConsoleExporter.Run(options),
-                    (OtlpOptions options) => TestOtlpExporter.Run(options.Endpoint),
+                    (OtlpOptions options) => TestOtlpExporter.Run(options.Endpoint, options.PropagateClientContext),
                     errs => 1);
 
             System.Console.ReadLine();
@@ -132,6 +132,9 @@ namespace Examples.Console
     {
         [Option('e', "endpoint", HelpText = "Target to which the exporter is going to send traces or metrics", Default = "localhost:55680")]
         public string Endpoint { get; set; }
+
+        [Option('c', "clietcontext", HelpText = "The sample client will propagate the context to the server", Default = true)]
+        public bool PropagateClientContext { get; set; }
     }
 
 #pragma warning restore SA1402 // File may only contain a single type

@@ -21,12 +21,12 @@ namespace Examples.Console
 {
     internal static class TestOtlpExporter
     {
-        internal static object Run(string endpoint)
+        internal static object Run(string endpoint, bool doClientContextPropagation)
         {
-            return RunWithActivitySource(endpoint);
+            return RunWithActivitySource(endpoint, doClientContextPropagation);
         }
 
-        private static object RunWithActivitySource(string endpoint)
+        private static object RunWithActivitySource(string endpoint, bool doClientContextPropagation)
         {
             // Enable OpenTelemetry for the sources "Samples.SampleServer" and "Samples.SampleClient"
             // and use OTLP exporter.
@@ -39,7 +39,7 @@ namespace Examples.Console
             // which decide to use OpenTelemetry.
             using (var sample = new InstrumentationWithActivitySource())
             {
-                sample.Start();
+                sample.Start(doClientContextPropagation: doClientContextPropagation);
 
                 System.Console.WriteLine("Traces are being created and exported" +
                     "to OTLP in the background." +
