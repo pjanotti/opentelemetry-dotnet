@@ -144,7 +144,7 @@ namespace Examples.Console
                                 };
 
                                 // Inject the W3c context so it is propagated to the server.
-                                if (false && doClientContextPropagation && activity != null)
+                                if (doClientContextPropagation && activity != null)
                                 {
                                     request.Headers.Add(CustomTraceParentHeader, activity.Id);
                                 }
