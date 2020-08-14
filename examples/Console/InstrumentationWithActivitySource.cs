@@ -66,7 +66,10 @@ namespace Examples.Console
                         {
                             var context = this.listener.GetContext();
 
-                            using var activity = CreateActivity(source, context, context.Request.Headers[CustomTraceParentHeader]);
+                            using var activity = source.StartActivity(
+                                    $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
+                                    ActivityKind.Server,
+                                    context.Request.Headers[CustomTraceParentHeader]);
 
                             var headerKeys = context.Request.Headers.AllKeys;
                             foreach (var headerKey in headerKeys)
@@ -91,21 +94,6 @@ namespace Examples.Console
                             context.Response.ContentLength64 = echo.Length;
                             context.Response.OutputStream.Write(echo, 0, echo.Length);
                             context.Response.Close();
-
-                            static Activity CreateActivity(ActivitySource source, HttpListenerContext context, string traceParent)
-                            {
-                                if (string.IsNullOrEmpty(traceParent))
-                                {
-                                    return source.StartActivity(
-                                        $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
-                                        ActivityKind.Server);
-                                }
-
-                                return source.StartActivity(
-                                    $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
-                                    ActivityKind.Server,
-                                    traceParent);
-                            }
                         }
                         catch (Exception)
                         {
@@ -156,7 +144,7 @@ namespace Examples.Console
                                 };
 
                                 // Inject the W3c context so it is propagated to the server.
-                                if (doClientContextPropagation && activity != null)
+                                if (false && doClientContextPropagation && activity != null)
                                 {
                                     request.Headers.Add(CustomTraceParentHeader, activity.Id);
                                 }
