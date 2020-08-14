@@ -24,15 +24,16 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenTelemetry.Context.Propagation;
 
 namespace Examples.Console
 {
     internal class InstrumentationWithActivitySource : IDisposable
     {
-        private const string W3CTraceParentHeader = "traceparent";
         private const string RequestPath = "/api/request";
-        private SampleServer server = new SampleServer();
-        private SampleClient client = new SampleClient();
+        private static readonly ITextFormat PropagationFormat = new TraceContextFormat();
+        private readonly SampleServer server = new SampleServer();
+        private readonly SampleClient client = new SampleClient();
 
         public void Start(ushort port = 19999, bool doClientContextPropagation = true)
         {
@@ -49,7 +50,7 @@ namespace Examples.Console
 
         private class SampleServer : IDisposable
         {
-            private HttpListener listener = new HttpListener();
+            private readonly HttpListener listener = new HttpListener();
 
             public void Start(string url)
             {
@@ -66,10 +67,12 @@ namespace Examples.Console
                         {
                             var context = this.listener.GetContext();
 
+                            ActivityContext activityContext = PropagationFormat.Extract(default, context.Request, (request, name) => request.Headers.GetValues(name));
+
                             using var activity = source.StartActivity(
                                 $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
                                 ActivityKind.Server,
-                                context.Request.Headers[W3CTraceParentHeader]);
+                                activityContext);
 
                             var headerKeys = context.Request.Headers.AllKeys;
                             foreach (var headerKey in headerKeys)
@@ -146,7 +149,7 @@ namespace Examples.Console
                                 // Inject the W3c context so it is propagated to the server.
                                 if (doClientContextPropagation && activity != null)
                                 {
-                                    request.Headers.Add(W3CTraceParentHeader, activity.Id);
+                                    PropagationFormat.Inject(activity.Context, request, (request, name, value) => request.Headers.Add(name, value));
                                 }
 
                                 activity?.AddEvent(new ActivityEvent("SendAsync:Started"));

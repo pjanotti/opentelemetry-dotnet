@@ -47,8 +47,8 @@ namespace Examples.Console
                 sample.Start();
 
                 System.Console.WriteLine("Traces are being created and exported" +
-                    "to Jaeger in the background. Use Jaeger to view them." +
-                    "Press ENTER to stop.");
+                    " to Jaeger in the background. Use Jaeger to view them." +
+                    " Press ENTER to stop.");
                 System.Console.ReadLine();
             }
 
