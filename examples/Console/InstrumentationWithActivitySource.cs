@@ -24,14 +24,13 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using OpenTelemetry.Context.Propagation;
 
 namespace Examples.Console
 {
     internal class InstrumentationWithActivitySource : IDisposable
     {
+        private const string CustomTraceParentHeader = "x-custom-traceparent";
         private const string RequestPath = "/api/request";
-        private static readonly ITextFormat PropagationFormat = new TraceContextFormat();
         private readonly SampleServer server = new SampleServer();
         private readonly SampleClient client = new SampleClient();
 
@@ -67,12 +66,7 @@ namespace Examples.Console
                         {
                             var context = this.listener.GetContext();
 
-                            ActivityContext activityContext = PropagationFormat.Extract(default, context.Request, (request, name) => request.Headers.GetValues(name));
-
-                            using var activity = source.StartActivity(
-                                $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
-                                ActivityKind.Server,
-                                activityContext);
+                            using var activity = CreateActivity(source, context, context.Request.Headers[CustomTraceParentHeader]);
 
                             var headerKeys = context.Request.Headers.AllKeys;
                             foreach (var headerKey in headerKeys)
@@ -97,6 +91,21 @@ namespace Examples.Console
                             context.Response.ContentLength64 = echo.Length;
                             context.Response.OutputStream.Write(echo, 0, echo.Length);
                             context.Response.Close();
+
+                            static Activity CreateActivity(ActivitySource source, HttpListenerContext context, string traceParent)
+                            {
+                                if (string.IsNullOrEmpty(traceParent))
+                                {
+                                    return source.StartActivity(
+                                        $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
+                                        ActivityKind.Server);
+                                }
+
+                                return source.StartActivity(
+                                    $"{context.Request.HttpMethod}:{context.Request.Url.AbsolutePath}",
+                                    ActivityKind.Server,
+                                    traceParent);
+                            }
                         }
                         catch (Exception)
                         {
@@ -149,7 +158,7 @@ namespace Examples.Console
                                 // Inject the W3c context so it is propagated to the server.
                                 if (doClientContextPropagation && activity != null)
                                 {
-                                    PropagationFormat.Inject(activity.Context, request, (request, name, value) => request.Headers.Add(name, value));
+                                    request.Headers.Add(CustomTraceParentHeader, activity.Id);
                                 }
 
                                 activity?.AddEvent(new ActivityEvent("SendAsync:Started"));
